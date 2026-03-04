@@ -427,7 +427,21 @@ def run_write_and_publish():
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
 
-    result = db.table("posts").insert(post).execute()
+    # Handle duplicate slug by appending a short suffix
+    base_slug = post["slug"]
+    for attempt in range(5):
+        if attempt > 0:
+            post["slug"] = f"{base_slug}-{attempt}"
+        try:
+            result = db.table("posts").insert(post).execute()
+            break
+        except Exception as e:
+            if "posts_slug_key" in str(e) and attempt < 4:
+                logger.warning(f"Slug '{post['slug']}' exists, retrying with suffix")
+                continue
+            logger.error(f"Failed to save post: {e}")
+            db.table("keywords").update({"status": "used"}).eq("id", kw_record["id"]).execute()
+            return
     if not result.data:
         logger.error("Failed to save post to Supabase")
         return
