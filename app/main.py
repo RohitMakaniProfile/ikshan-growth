@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import ORJSONResponse
 
 from app.config import get_settings
-from app.routers import blog
+from app.routers import blog, reddit
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -26,6 +26,7 @@ scheduler = AsyncIOScheduler(timezone="Asia/Kolkata")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     from app.services.blog_writer import run_keyword_hunt, run_write_and_publish
+    from app.services.reddit_monitor import run_reddit_monitor
 
     # Every Monday 9am IST — keyword hunt
     scheduler.add_job(
@@ -41,9 +42,16 @@ async def lifespan(app: FastAPI):
         id="daily_publish",
         replace_existing=True,
     )
+    # Every 6 hours — Reddit monitor (find questions + draft answers)
+    scheduler.add_job(
+        run_reddit_monitor,
+        CronTrigger(hour="0,6,12,18", minute=0, timezone="Asia/Kolkata"),
+        id="reddit_monitor",
+        replace_existing=True,
+    )
 
     scheduler.start()
-    logger.info("🚀 ikshan-growth started | Blog scheduler active (Mon 9am keywords, daily 10am post)")
+    logger.info("🚀 ikshan-growth started | Blog: daily 10am | Reddit monitor: every 6h")
     yield
     scheduler.shutdown()
     logger.info("🛑 ikshan-growth shutting down")
@@ -66,11 +74,11 @@ def create_app() -> FastAPI:
     )
 
     # ── Routers ────────────────────────────────────────────────
-    app.include_router(blog.router, prefix="/blog", tags=["Blog"])
+    app.include_router(blog.router,   prefix="/blog",   tags=["Blog"])
+    app.include_router(reddit.router, prefix="/reddit", tags=["Reddit"])
 
-    # Future routers — just add here when ready:
+    # Future routers:
     # app.include_router(linkedin.router, prefix="/linkedin", tags=["LinkedIn"])
-    # app.include_router(reddit.router,   prefix="/reddit",   tags=["Reddit"])
     # app.include_router(quora.router,    prefix="/quora",    tags=["Quora"])
 
     @app.get("/health")
