@@ -157,7 +157,7 @@ def _score_keyword(keyword: str) -> dict:
         "relevance_score": relevance,
         "difficulty_score": difficulty,
         "final_score": final_score,
-        "source": "local",
+        "source": "tavily",
         "status": "queued",
     }
 
