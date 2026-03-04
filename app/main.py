@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import ORJSONResponse
 
 from app.config import get_settings
-from app.routers import blog, reddit
+from app.routers import blog, reddit, quora
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -27,6 +27,7 @@ scheduler = AsyncIOScheduler(timezone="Asia/Kolkata")
 async def lifespan(app: FastAPI):
     from app.services.blog_writer import run_keyword_hunt, run_write_and_publish
     from app.services.reddit_monitor import run_reddit_monitor
+    from app.services.quora_monitor import run_quora_monitor
 
     # Every Monday 9am IST — keyword hunt
     scheduler.add_job(
@@ -49,9 +50,16 @@ async def lifespan(app: FastAPI):
         id="reddit_monitor",
         replace_existing=True,
     )
+    # Every 8 hours — Quora monitor (find questions + draft answers)
+    scheduler.add_job(
+        run_quora_monitor,
+        CronTrigger(hour="2,10,18", minute=0, timezone="Asia/Kolkata"),
+        id="quora_monitor",
+        replace_existing=True,
+    )
 
     scheduler.start()
-    logger.info("🚀 ikshan-growth started | Blog: daily 10am | Reddit monitor: every 6h")
+    logger.info("🚀 ikshan-growth | Blog: 10am | Reddit: 6h | Quora: 8h")
     yield
     scheduler.shutdown()
     logger.info("🛑 ikshan-growth shutting down")
@@ -76,10 +84,10 @@ def create_app() -> FastAPI:
     # ── Routers ────────────────────────────────────────────────
     app.include_router(blog.router,   prefix="/blog",   tags=["Blog"])
     app.include_router(reddit.router, prefix="/reddit", tags=["Reddit"])
+    app.include_router(quora.router,  prefix="/quora",  tags=["Quora"])
 
     # Future routers:
     # app.include_router(linkedin.router, prefix="/linkedin", tags=["LinkedIn"])
-    # app.include_router(quora.router,    prefix="/quora",    tags=["Quora"])
 
     @app.get("/health")
     async def health():
