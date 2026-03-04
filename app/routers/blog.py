@@ -114,6 +114,25 @@ async def mark_keyword_used(keyword_id: str):
     return {"status": "marked used"}
 
 
+# ── Manual Triggers ──────────────────────────────────────────────
+@router.post("/hunt")
+async def trigger_keyword_hunt():
+    """Manually trigger keyword hunt."""
+    from app.services.blog_writer import run_keyword_hunt
+    result = run_keyword_hunt()
+    return {"status": "done", "keywords_saved": len(result)}
+
+
+@router.post("/publish")
+async def trigger_publish():
+    """Manually trigger write + publish."""
+    from app.services.blog_writer import run_write_and_publish
+    post = run_write_and_publish()
+    if not post:
+        return {"status": "no_keywords", "message": "No queued keywords found"}
+    return {"status": "published", "title": post["title"], "slug": post["slug"]}
+
+
 # ── Sitemap ───────────────────────────────────────────────────────
 @router.get("/sitemap.xml", response_class=Response)
 async def sitemap():
