@@ -6,6 +6,7 @@ Stores posts in Supabase, sends Telegram notification.
 
 import json
 import math
+import os
 import re
 import time
 import logging
@@ -19,11 +20,69 @@ from app.config import get_settings
 
 logger = logging.getLogger(__name__)
 
-# ── Seed topics derived from Ikshan's 138 task categories ────────
-# Mapped to 4 Growth Buckets: Lead Gen | Sales & Retention | Business Strategy | Save Time
+# ── Load G2 tool data ─────────────────────────────────────────────
+_G2_DATA: dict = {}
+try:
+    _data_path = os.path.join(os.path.dirname(__file__), "..", "data", "g2_tools.json")
+    with open(os.path.normpath(_data_path)) as f:
+        _G2_DATA = json.load(f)
+    logger.info(f"Loaded G2 data: {len(_G2_DATA)} personas")
+except Exception as e:
+    logger.warning(f"Could not load G2 data: {e}")
+
+
+def _get_g2_context(keyword: str) -> str:
+    """Find relevant G2 tools for a keyword to inject into blog prompt."""
+    kw = keyword.lower()
+    persona_map = {
+        "sales": ["Sales Execution & Enablement", "Lead Management & Conversion"],
+        "lead": ["B2B Lead Generation", "Sales Execution & Enablement"],
+        "marketing": ["Marketing & Sales Automation", "Content & Social Media"],
+        "seo": ["Marketing & Sales Automation", "Business Intelligence & Analytics"],
+        "content": ["Content & Social Media", "Marketing & Sales Automation"],
+        "analytics": ["Business Intelligence & Analytics", "Marketing & Sales Automation"],
+        "finance": ["Finance Legal & Admin", "Financial Health & Risk"],
+        "crm": ["Lead Management & Conversion", "Sales Execution & Enablement"],
+        "automation": ["Marketing & Sales Automation", "Org Efficiency & Hiring"],
+        "hiring": ["Org Efficiency & Hiring", "Recruiting & HR Ops"],
+        "hr": ["Recruiting & HR Ops", "Org Efficiency & Hiring"],
+        "productivity": ["Personal & Team Productivity", "Org Efficiency & Hiring"],
+        "team": ["Personal & Team Productivity", "Org Efficiency & Hiring"],
+        "customer": ["Customer Success & Reputation", "Customer Support Ops"],
+        "support": ["Customer Support Ops", "Customer Success & Reputation"],
+        "competitor": ["Market Strategy & Innovation", "Business Intelligence & Analytics"],
+        "design": ["Content & Social Media"],
+        "ai tool": ["Marketing & Sales Automation", "Personal & Team Productivity"],
+        "startup": ["Marketing & Sales Automation", "Business Intelligence & Analytics"],
+    }
+    matched_personas = []
+    for signal, personas in persona_map.items():
+        if signal in kw:
+            matched_personas.extend(personas)
+    matched_personas = list(dict.fromkeys(matched_personas))[:2]
+
+    tools_text = []
+    for persona in matched_personas:
+        tools = _G2_DATA.get(persona, [])[:3]
+        if tools:
+            tools_text.append(f"\n**Top tools for {persona} (G2 verified):**")
+            for t in tools:
+                pros = " | ".join(t["pros"][:2]) if t["pros"] else ""
+                cons = t["cons"][0] if t["cons"] else ""
+                tools_text.append(
+                    f"- **{t['name']}** — Rating: {t['rating']}/5 ({t['reviews']} reviews)\n"
+                    f"  {t['description'][:150]}\n"
+                    f"  Pros: {pros}\n"
+                    f"  Con: {cons}"
+                )
+    return "\n".join(tools_text)
+
+
+# ── Seed topics ───────────────────────────────────────────────────
+# 4 Growth Buckets + AI/Startup/Design/Team verticals
 
 SEED_TOPICS = [
-    # ── LEAD GENERATION (Marketing, SEO & Social) ─────────────────
+    # ── LEAD GENERATION ───────────────────────────────────────────
     "how to get more leads from Google website small business",
     "SEO for small business website 2026",
     "Google Business Profile optimization tips for local business",
@@ -39,7 +98,7 @@ SEED_TOPICS = [
     "how to automate LinkedIn outreach small business",
     "viral content ideas for small business social media",
     "personal brand building on LinkedIn for founders",
-    "how to improve Google Business Profile leads",
+    "best B2B lead generation tools for small business 2026",
     "ecommerce product listing SEO tips",
 
     # ── SALES & RETENTION ─────────────────────────────────────────
@@ -52,11 +111,11 @@ SEED_TOPICS = [
     "how to speed up deal closure small business",
     "customer retention strategies SMB",
     "how to follow up leads automatically",
-    "why customers don't convert website",
-    "how to reduce missed leads faster reply",
+    "best CRM tools for small business teams 2026",
     "call tracking and conversation intelligence tools",
+    "best sales enablement tools for small teams",
 
-    # ── BUSINESS STRATEGY (Intelligence, Market & Org) ────────────
+    # ── BUSINESS STRATEGY ─────────────────────────────────────────
     "sales dashboard for small business owners",
     "marketing ROI dashboard small business",
     "how to track marketing performance KPIs",
@@ -67,13 +126,13 @@ SEED_TOPICS = [
     "how to hire faster small business",
     "market trend research tools for small business",
     "sales revenue forecasting small business",
-    "AI business analytics for founders",
+    "best business analytics tools for founders 2026",
     "how to build SOPs for small business",
     "financial health dashboard for business owners",
     "budget vs actual analysis small business",
-    "how to predict demand small business inventory",
+    "best competitive intelligence tools for startups",
 
-    # ── SAVE TIME (Automation, Workflow, Ops, Finance, Admin) ─────
+    # ── SAVE TIME & AUTOMATION ────────────────────────────────────
     "how to automate lead capture into CRM",
     "invoice data extraction software small business",
     "how to summarize meetings automatically AI",
@@ -81,16 +140,56 @@ SEED_TOPICS = [
     "email automation sequences small business",
     "how to automate social media posting",
     "expense tracking automation small business",
-    "resume screening automation tools",
+    "best resume screening tools for small business",
     "how to automate invoice and payment reminders",
     "contract review automation small business",
-    "how to extract data from PDF to spreadsheet",
+    "best workflow automation tools for 5 person team",
     "WhatsApp auto reply business automation",
     "support ticket routing automation",
     "how to automate employee onboarding",
     "content calendar automation tools small business",
-    "how to automate procurement approvals",
     "AI tools to save time for small business owners",
+
+    # ── AI FOR BUSINESS ───────────────────────────────────────────
+    "best AI tools for small business revenue growth 2026",
+    "how to use AI for sales forecasting small business",
+    "AI meeting notes tools for small teams",
+    "best AI writing tools for business content 2026",
+    "how AI can replace manual data entry small business",
+    "ChatGPT use cases for small business owners",
+    "AI customer support chatbot for small business",
+    "best AI analytics tools for startup founders",
+    "how to use AI for competitive research startup",
+    "AI tools that save 10 hours per week small business",
+
+    # ── STARTUP & FUNDING ─────────────────────────────────────────
+    "how to validate a startup idea before building",
+    "best tools for early stage startup growth",
+    "how to get first 100 customers startup",
+    "startup pitch deck mistakes to avoid",
+    "how to find angel investors for startup India",
+    "product market fit checklist startup founders",
+    "best productivity tools for startup teams 2026",
+    "how to grow revenue from 0 to 10 lakh startup",
+    "startup financial model basics for founders",
+    "best free tools for bootstrapped startups",
+
+    # ── AI FOR DESIGNERS & CREATIVE TEAMS ────────────────────────
+    "best AI design tools for small teams 2026",
+    "how to use AI for social media graphics small business",
+    "AI video creation tools for marketing teams",
+    "best tools for content creation team of 5 people",
+    "how to create content 10x faster with AI",
+    "best screen recording tools for remote teams",
+    "design collaboration tools for small teams",
+
+    # ── TEAM COLLABORATION & PRODUCTIVITY ────────────────────────
+    "best project management tools for 5 person team",
+    "how a 5 member team can work like a 50 person company",
+    "best team productivity tools for startups 2026",
+    "how to build async workflows small remote team",
+    "best tools for team collaboration in India startups",
+    "how to run daily standups remote team small business",
 ]
 
 
@@ -257,64 +356,78 @@ def _get_cover_image(query: str) -> str | None:
     return None
 
 
-def _write_post_with_claude(keyword: str, context: str) -> dict:
+def _write_post_with_claude(keyword: str, context: str, g2_context: str = "") -> dict:
     s = get_settings()
-    prompt = f"""You are an expert SEO content writer for ikshan.in — an AI-powered growth platform for small and mid-sized businesses (SMBs).
+    is_tool_comparison = any(w in keyword.lower() for w in ["best", "top", "tools", "software", "platforms"])
+    tool_section = f"""
+**Real Tool Data (G2-verified — use these in your comparison):**
+{g2_context}
 
-**What Ikshan does:** Ikshan helps SMB owners instantly identify their biggest growth leaks across 4 areas:
+""" if g2_context and is_tool_comparison else ""
+
+    comparison_instructions = """
+- If the post is about "best tools" or "top tools": include a **comparison table** with columns: Tool | Best For | Rating | Free Plan? | Key Feature
+- Use real tool names, real ratings, real pros/cons from the data provided
+""" if is_tool_comparison else ""
+
+    prompt = f"""You are an expert SEO content writer for ikshan.in — an AI-powered growth analytics platform for small and mid-sized businesses (SMBs) and startups.
+
+**What Ikshan does:** Ikshan diagnoses WHY a business isn't growing. It scrapes your website, analyzes your context, and gives you a Root Cause Analysis of your biggest growth leaks — across:
 1. Lead Generation (SEO, social media, ads, B2B outreach)
 2. Sales & Retention (conversion, churn, upsell, reviews)
-3. Business Strategy (analytics dashboards, market research, cash flow, hiring)
-4. Save Time (automation of invoices, support, HR, emails, meetings)
+3. Business Strategy (analytics, market research, cash flow, hiring)
+4. Automation (invoices, support, HR, emails, meetings — save 10+ hours/week)
 
 Write a complete, SEO-optimized blog post for the following keyword:
 
 **Focus Keyword:** {keyword}
 
-**Competitor Research (write something BETTER than these):**
+**Competitor Research (write something BETTER and more useful than these):**
 {context}
-
+{tool_section}
 **Writing Rules:**
 - Word count: 1800–2200 words minimum
-- Tone: practical, direct, data-driven — written for busy SMB owners
-- No buzzword fluff — every sentence must be actionable
+- Tone: practical, direct, founder-friendly — like a knowledgeable friend who runs a business
+- No buzzword fluff — every sentence must save the reader time or money
 - Focus keyword in: H1, first 100 words, at least 2 H2s, meta description
-- 2 natural mentions of Ikshan.in as a tool that solves this problem
-- India-relevant examples where applicable (Indian SMBs, rupees, local context)
-- End with a clear CTA to try ikshan.in
-
+- 2 natural mentions of Ikshan.in as a tool that diagnoses growth problems
+- India-relevant examples where applicable (Indian SMBs, rupees ₹, local context)
+- End with a clear CTA to try ikshan.in for free
+{comparison_instructions}
 **Mandatory Structure:**
 
-1. **H1** — includes keyword, max 60 chars
-2. **Intro** — 120–150 words: hook with a pain point, state the keyword problem, preview what reader will learn
-3. **Key Takeaways box:**
+1. **H1** — includes keyword, punchy, max 65 chars
+2. **Intro** — 120–150 words: open with a sharp pain point + stat, state the keyword problem, tell reader exactly what they'll learn
+3. **Key Takeaways box** (use this exact markdown):
    > **Key Takeaways**
    > - [actionable insight 1]
    > - [actionable insight 2]
    > - [actionable insight 3]
    > - [actionable insight 4]
    > - [actionable insight 5]
-4. **## Table of Contents** — bullet list of all H2 section links
+4. **## Table of Contents** — bullet list of all H2 links (use anchor format: [Section Name](#section-name))
 5. **Main body** — 5 to 7 H2 sections, each with:
-   - H3 sub-sections
-   - Numbered or bullet lists
-   - Bold key terms
+   - H3 sub-sections where needed
+   - Numbered steps or bullet lists
+   - **Bold** key terms and tool names
    - At least 1 real stat or data point per H2
-6. **## Frequently Asked Questions** — 5 Q&As:
-   ### Q: [question]
-   [2–3 sentence answer, includes keyword naturally]
-7. **## Conclusion** — 100 words: summarize top insight + CTA to ikshan.in
+   - For "best tools" topics: include a markdown comparison table (| Tool | Best For | Rating | Free Plan | Standout Feature |)
+6. **## Quick Comparison** (only for "best tools" posts) — a summary table of all tools covered
+7. **## Frequently Asked Questions** — 5 Q&As:
+   ### Q: [question readers actually Google]
+   **A:** [2–3 sentence answer, includes keyword naturally]
+8. **## Conclusion** — 100 words: top insight + CTA to try ikshan.in free
 
 **Pick the most relevant category:**
-- "Lead Generation" — if about SEO, ads, social media, B2B outreach, content
-- "Sales & Retention" — if about conversion, churn, reviews, upsell, CRM
-- "Business Strategy" — if about analytics, dashboards, market research, finance, hiring
-- "Automation" — if about saving time, workflow automation, AI tools, ops
+- "Lead Generation" — SEO, ads, social media, B2B outreach, content marketing
+- "Sales & Retention" — conversion, churn, reviews, upsell, CRM, sales tools
+- "Business Strategy" — analytics, dashboards, market research, finance, hiring, startup advice
+- "Automation" — saving time, workflow automation, AI tools, ops, team productivity
 
 **Output (JSON only, no markdown wrapper, no extra text):**
 {{
-  "title": "SEO title 50–60 chars with keyword",
-  "meta_description": "155-char meta with keyword and clear benefit",
+  "title": "SEO title 50–65 chars with keyword",
+  "meta_description": "155-char meta with keyword and clear reader benefit",
   "content": "Full markdown post",
   "category": "Lead Generation | Sales & Retention | Business Strategy | Automation"
 }}"""
@@ -409,8 +522,9 @@ def run_write_and_publish():
     logger.info(f"Keyword: {keyword}")
 
     context = _research_keyword(keyword)
+    g2_context = _get_g2_context(keyword)
     cover = _get_cover_image(keyword)
-    post_data = _write_post_with_claude(keyword, context)
+    post_data = _write_post_with_claude(keyword, context, g2_context)
 
     words = len(post_data["content"].split())
     post = {
