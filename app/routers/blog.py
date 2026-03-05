@@ -114,6 +114,28 @@ async def mark_keyword_used(keyword_id: str):
     return {"status": "marked used"}
 
 
+# ── Admin ────────────────────────────────────────────────────────
+@router.delete("/posts/{slug}")
+async def delete_post(slug: str):
+    db = _db()
+    result = db.table("posts").delete().eq("slug", slug).execute()
+    return {"deleted": len(result.data), "slug": slug}
+
+
+@router.delete("/posts/by-date/{date}")
+async def delete_posts_by_date(date: str):
+    """Delete all posts published on a given date. Format: YYYY-MM-DD"""
+    db = _db()
+    result = (
+        db.table("posts")
+        .delete()
+        .gte("published_at", f"{date}T00:00:00Z")
+        .lt("published_at", f"{date}T23:59:59Z")
+        .execute()
+    )
+    return {"deleted": len(result.data), "date": date}
+
+
 # ── Manual Triggers ──────────────────────────────────────────────
 @router.post("/hunt")
 async def trigger_keyword_hunt():
