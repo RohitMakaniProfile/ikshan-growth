@@ -365,69 +365,98 @@ def _write_post_with_claude(keyword: str, context: str, g2_context: str = "") ->
 
 """ if g2_context and is_tool_comparison else ""
 
-    comparison_instructions = """
-- If the post is about "best tools" or "top tools": include a **comparison table** with columns: Tool | Best For | Rating | Free Plan? | Key Feature
-- Use real tool names, real ratings, real pros/cons from the data provided
-""" if is_tool_comparison else ""
+    prompt = f"""You are an expert SEO content writer for ikshan.in — an AI-powered growth analytics platform for founders and business owners.
 
-    prompt = f"""You are an expert SEO content writer for ikshan.in — an AI-powered growth analytics platform for small and mid-sized businesses (SMBs) and startups.
-
-**What Ikshan does:** Ikshan diagnoses WHY a business isn't growing. It scrapes your website, analyzes your context, and gives you a Root Cause Analysis of your biggest growth leaks — across:
-1. Lead Generation (SEO, social media, ads, B2B outreach)
-2. Sales & Retention (conversion, churn, upsell, reviews)
-3. Business Strategy (analytics, market research, cash flow, hiring)
-4. Automation (invoices, support, HR, emails, meetings — save 10+ hours/week)
+**What Ikshan does:** Ikshan diagnoses WHY a business isn't growing. It scrapes your website, analyzes your context, and gives a Root Cause Analysis of your biggest growth leaks across Lead Generation, Sales & Retention, Business Strategy, and Automation.
 
 Write a complete, SEO-optimized blog post for the following keyword:
 
 **Focus Keyword:** {keyword}
 
-**Competitor Research (write something BETTER and more useful than these):**
+**Competitor Research (read these, then write something sharper and more insightful):**
 {context}
 {tool_section}
-**Writing Rules:**
-- Word count: 1800–2200 words minimum
-- Tone: practical, direct, founder-friendly — like a knowledgeable friend who runs a business
-- No buzzword fluff — every sentence must save the reader time or money
-- Focus keyword in: H1, first 100 words, at least 2 H2s, meta description
-- 2 natural mentions of Ikshan.in as a tool that diagnoses growth problems
-- India-relevant examples where applicable (Indian SMBs, rupees ₹, local context)
-- End with a clear CTA to try ikshan.in for free
-{comparison_instructions}
-**Mandatory Structure:**
+---
 
-1. **H1** — includes keyword, punchy, max 65 chars
-2. **Intro** — 120–150 words: open with a sharp pain point + stat, state the keyword problem, tell reader exactly what they'll learn
-3. **Key Takeaways box** (use this exact markdown):
-   > **Key Takeaways**
-   > - [actionable insight 1]
-   > - [actionable insight 2]
-   > - [actionable insight 3]
-   > - [actionable insight 4]
-   > - [actionable insight 5]
-4. **## Table of Contents** — bullet list of all H2 links (use anchor format: [Section Name](#section-name))
-5. **Main body** — 5 to 7 H2 sections, each with:
-   - H3 sub-sections where needed
-   - Numbered steps or bullet lists
-   - **Bold** key terms and tool names
-   - At least 1 real stat or data point per H2
-   - For "best tools" topics: include a markdown comparison table (| Tool | Best For | Rating | Free Plan | Standout Feature |)
-6. **## Quick Comparison** (only for "best tools" posts) — a summary table of all tools covered
-7. **## Frequently Asked Questions** — 5 Q&As:
-   ### Q: [question readers actually Google]
-   **A:** [2–3 sentence answer, includes keyword naturally]
-8. **## Conclusion** — 100 words: top insight + CTA to try ikshan.in free
+## TITLE RULES — THIS IS CRITICAL
 
-**Pick the most relevant category:**
-- "Lead Generation" — SEO, ads, social media, B2B outreach, content marketing
-- "Sales & Retention" — conversion, churn, reviews, upsell, CRM, sales tools
-- "Business Strategy" — analytics, dashboards, market research, finance, hiring, startup advice
-- "Automation" — saving time, workflow automation, AI tools, ops, team productivity
+The title must NOT say "small business" or "best X tools for Y" generically.
+
+Instead, the title must feel like an insider insight the reader didn't know:
+- Lead with a specific stat, outcome, or contrarian angle
+- Write FOR the reader, not ABOUT them ("Your", "You", "We Tested")
+- Examples of GOOD titles:
+  - "The CRM That Helped 3,000+ Founders Close 40% More Deals"
+  - "We Tested 18 AI Writing Tools. Only 3 Were Worth It."
+  - "Your Sales Team Is Losing Leads at This Exact Step (Here's the Fix)"
+  - "This One Dashboard Replaced 4 Spreadsheets for 500+ Founders"
+  - "Why 73% of Founders Get No ROI From Google Ads (And What Works Instead)"
+- Examples of BAD titles (never use):
+  - "Best CRM Tools for Small Business 2026"
+  - "Top 10 Marketing Tools for Small Businesses"
+  - "How to Use AI for Small Business"
+
+---
+
+## STRUCTURE — SKIMMER-FIRST, DETAIL-SECOND
+
+Today's reader skims first, reads if hooked. Structure accordingly:
+
+**1. H1** — Catchy title (from rules above), max 65 chars
+
+**2. Intro** — 60–80 words ONLY. One sharp pain point + one stat. No filler.
+
+**3. ## The Quick Answer** (skimmer section — appears BEFORE all other sections):
+Write 5–7 bullet points that give the FULL crux of the post.
+Each bullet = one complete insight, not a teaser.
+Someone who reads ONLY this box should walk away with value.
+Format:
+> **The Quick Answer**
+> - [complete actionable insight with specific detail]
+> - [complete actionable insight with specific detail]
+> ...
+
+**4. ## Table of Contents** — bullet list of H2 links
+
+**5. Main Body** — 5 to 7 H2 sections. Each section must:
+   - Open with a 1-line insight statement (the "so what")
+   - Use H3 sub-sections for breakdown
+   - Include numbered steps or bullet lists
+   - Have at least 1 real stat or data point
+   - Bold key terms and tool/product names
+   - For tool comparisons: use a markdown table (| Tool | Best For | Rating | Free Plan | Why It Wins |)
+
+**6. ## Quick Comparison Table** (only for tool/software posts):
+Full summary table of all tools with: Tool | Rating | Free Plan | Best For | Standout Feature
+
+**7. ## 5 Questions Founders Actually Ask**
+Format each as:
+### [Question in plain human language]
+**Short answer** (2–3 lines, no padding)
+
+**8. ## Bottom Line** — 80 words max. The #1 thing to do TODAY + CTA to ikshan.in
+
+---
+
+## WRITING RULES
+
+- Word count: 1600–2000 words (quality over quantity)
+- Never say "small business" — say "your business", "founders", "your team", "operators"
+- Every sentence must earn its place — cut anything that doesn't teach, save time, or reveal something
+- 2 natural mentions of Ikshan.in (not salesy — as a tool that finds growth leaks)
+- India context where natural (₹, Indian examples, local tools)
+- Tone: direct, smart, like a founder who's done this — not a content marketer
+
+**Category — pick the most accurate:**
+- "Lead Generation" — SEO, ads, outreach, content, social
+- "Sales & Retention" — conversion, churn, upsell, CRM
+- "Business Strategy" — analytics, research, finance, hiring, startup
+- "Automation" — AI tools, ops, workflows, time-saving
 
 **Output (JSON only, no markdown wrapper, no extra text):**
 {{
-  "title": "SEO title 50–65 chars with keyword",
-  "meta_description": "155-char meta with keyword and clear reader benefit",
+  "title": "Catchy insight-driven title — max 65 chars",
+  "meta_description": "155-char meta: specific benefit + keyword + who it's for",
   "content": "Full markdown post",
   "category": "Lead Generation | Sales & Retention | Business Strategy | Automation"
 }}"""
